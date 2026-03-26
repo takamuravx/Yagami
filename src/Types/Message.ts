@@ -205,6 +205,26 @@ export type ButtonReplyInfo = {
 	index: number
 }
 
+export type Button = {
+	buttonId: string
+	buttonText: string
+	type: proto.Message.Button.Type
+}
+
+export type ButtonMessage = {
+	text: string
+	buttons: Button[]
+	footer?: string
+	headerType?: proto.Message.ButtonsMessage.HeaderType
+	title?: string
+	image?: WAMediaUpload
+	document?: WAMediaUpload
+	video?: WAMediaUpload
+	gifPlayback?: boolean
+	jpegThumbnail?: string
+	caption?: string
+}
+
 export type GroupInviteInfo = {
 	inviteCode: string
 	inviteExpiration: number
@@ -264,6 +284,9 @@ export type AnyRegularMessageContent = (
 			businessOwnerJid?: string
 			body?: string
 			footer?: string
+	  }
+	| {
+			buttons: ButtonMessage
 	  }
 	| SharePhoneNumber
 	| RequestPhoneNumber
