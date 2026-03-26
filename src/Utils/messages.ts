@@ -14,6 +14,7 @@ import {
 import type {
 	AnyMediaMessageContent,
 	AnyMessageContent,
+	Button,
 	DownloadableMessage,
 	MessageContentGenerationOptions,
 	MessageGenerationOptions,
@@ -601,6 +602,49 @@ export const generateWAMessageContent = async (
 				initiatedByMe: true
 			}
 		}
+	} else if (hasNonNullishProperty(message, 'buttons')) {
+		// Interactive buttons message support
+		const buttonMessage = message.buttons
+		const buttons: proto.Message.IButton[] = buttonMessage.buttons.map((btn: Button) => ({
+			buttonId: btn.buttonId,
+			buttonText: { displayText: btn.buttonText },
+			type: btn.type || WAProto.Message.Button.Type.RESPONSE
+		}))
+
+		const buttonsMessage: proto.Message.IButtonsMessage = {
+			contentText: buttonMessage.text,
+			footerText: buttonMessage.footer,
+			buttons: buttons,
+			headerType: buttonMessage.headerType || WAProto.Message.ButtonsMessage.HeaderType.EMPTY
+		}
+
+		// Handle media headers if provided
+		if (buttonMessage.image) {
+			const { imageMessage } = await prepareWAMessageMedia(
+				{ image: buttonMessage.image, caption: buttonMessage.caption, jpegThumbnail: buttonMessage.jpegThumbnail },
+				options
+			)
+			buttonsMessage.imageMessage = imageMessage
+			buttonsMessage.headerType = WAProto.Message.ButtonsMessage.HeaderType.IMAGE
+		} else if (buttonMessage.video) {
+			const { videoMessage } = await prepareWAMessageMedia(
+				{ video: buttonMessage.video, caption: buttonMessage.caption, gifPlayback: buttonMessage.gifPlayback, jpegThumbnail: buttonMessage.jpegThumbnail },
+				options
+			)
+			buttonsMessage.videoMessage = videoMessage
+			buttonsMessage.headerType = WAProto.Message.ButtonsMessage.HeaderType.VIDEO
+		} else if (buttonMessage.document) {
+			const { documentMessage } = await prepareWAMessageMedia(
+				{ document: buttonMessage.document, caption: buttonMessage.caption, fileName: buttonMessage.title, mimetype: 'application/pdf' },
+				options
+			)
+			buttonsMessage.documentMessage = documentMessage
+			buttonsMessage.headerType = WAProto.Message.ButtonsMessage.HeaderType.DOCUMENT
+		} else if (buttonMessage.title) {
+			buttonsMessage.headerType = WAProto.Message.ButtonsMessage.HeaderType.TEXT
+		}
+
+		m.buttonsMessage = buttonsMessage
 	} else {
 		m = await prepareWAMessageMedia(message, options)
 	}
@@ -1105,4 +1149,38 @@ export const assertMediaContent = (content: proto.IMessage | null | undefined) =
 	}
 
 	return mediaContent
+}
+
+/**
+ * Helper function to create a button message
+ * @param text The main text content of the message
+ * @param buttons Array of buttons with buttonId and buttonText
+ * @param footer Optional footer text
+ * @param options Optional additional options like image, video, document, title
+ * @returns ButtonMessage object ready to be sent
+ */
+export const createButtonMessage = (
+	text: string,
+	buttons: { buttonId: string; buttonText: string; type?: proto.Message.Button.Type }[],
+	footer?: string,
+	options?: {
+		image?: WAMediaUpload
+		video?: WAMediaUpload
+		document?: WAMediaUpload
+		title?: string
+		caption?: string
+		gifPlayback?: boolean
+		jpegThumbnail?: string
+	}
+) => {
+	return {
+		text,
+		buttons: buttons.map(btn => ({
+			buttonId: btn.buttonId,
+			buttonText: btn.buttonText,
+			type: btn.type || WAProto.Message.Button.Type.RESPONSE
+		})),
+		footer,
+		...options
+	}
 }
